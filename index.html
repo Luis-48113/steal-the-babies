@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steal the Babies</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background: #1a1a2e;
+            color: white;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        .card-shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .bounce-click:active {
+            transform: scale(0.95);
+        }
+
+        .rarity-dirt-cheap { color: #78350f; font-weight: normal; }
+        .rarity-common { color: #9ca3af; }
+        .rarity-uncommon { color: #4ade80; }
+        .rarity-epic { color: #a855f7; }
+        .rarity-legendary { color: #facc15; }
+        .rarity-secret { color: #f43f5e; font-weight: bold; text-shadow: 0 0 10px rgba(244, 63, 94, 0.5); }
+        .rarity-holy { color: #00f2ff; font-weight: 900; text-shadow: 0 0 15px #00f2ff; animation: pulse 1s infinite alternate; }
+
+        @keyframes pulse {
+            from { opacity: 0.7; transform: scale(1); }
+            to { opacity: 1; transform: scale(1.05); }
+        }
+
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 1rem;
+        }
+        
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+
+        @keyframes floating {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .withered {
+            filter: grayscale(0.5) contrast(1.2) brightness(0.8);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 bg-slate-800 p-6 rounded-2xl shadow-xl border-b-4 border-slate-700">
+            <div>
+                <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Steal the Babies</h1>
+                <p class="text-slate-400">Collect them all and save your progress!</p>
+            </div>
+            <div class="text-right mt-4 md:mt-0">
+                <div class="text-2xl font-bold text-yellow-400" id="coin-display">💰 0 Coins</div>
+                <div class="text-sm text-slate-300" id="roll-count">Total Rolls: 0</div>
+                <button onclick="resetGame()" class="text-[10px] bg-red-900/30 hover:bg-red-900/50 px-2 py-1 rounded mt-2 text-red-200">Reset Data</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Left Side: Action -->
+            <div class="space-y-6">
+                <div class="bg-slate-800 p-6 rounded-2xl shadow-lg text-center border-2 border-slate-700">
+                    <h2 class="text-xl mb-4 font-bold">Earn Money</h2>
+                    <button id="click-btn" class="bounce-click bg-blue-600 hover:bg-blue-500 w-32 h-32 rounded-full mx-auto flex items-center justify-center text-4xl shadow-2xl transition-all border-b-8 border-blue-800 active:border-b-0 active:translate-y-2">
+                        💸
+                    </button>
+                    <p class="mt-4 text-slate-400 text-sm">Click to get coins!</p>
+                </div>
+
+                <div class="bg-slate-800 p-6 rounded-2xl shadow-lg text-center border-2 border-slate-700">
+                    <h2 class="text-xl mb-4 font-bold">Gacha Machine</h2>
+                    <button id="roll-btn" class="bounce-click bg-purple-600 hover:bg-purple-500 w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all border-b-4 border-purple-800 active:border-b-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ROLL (10 💰)
+                    </button>
+                    <div class="mt-2 text-[9px] text-slate-400 uppercase tracking-tighter grid grid-cols-2 gap-1 text-left">
+                        <span>Holy: 0.1%</span>
+                        <span>Secret: 0.9%</span>
+                        <span>Legend: 4%</span>
+                        <span>Epic: 10%</span>
+                        <span>Uncommon: 15%</span>
+                        <span>Common: 30%</span>
+                        <span>Dirt: 40%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle: Result / Current -->
+            <div class="md:col-span-2 flex flex-col">
+                <div id="display-area" class="bg-slate-900/50 p-8 rounded-3xl border-4 border-dashed border-slate-700 flex flex-col items-center justify-center min-h-[400px] relative overflow-hidden">
+                    <div id="result-container" class="hidden flex flex-col items-center text-center">
+                        <div id="result-model" class="w-48 h-48 mb-6 floating"></div>
+                        <h3 id="result-rarity" class="uppercase tracking-widest text-sm font-bold mb-1">COMMON</h3>
+                        <h2 id="result-name" class="text-4xl font-bold mb-4">Character Name</h2>
+                        <div id="new-tag" class="hidden bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">NEW!</div>
+                    </div>
+                    <div id="idle-msg" class="text-slate-500 text-center">
+                        <p class="text-6xl mb-4">📦</p>
+                        <p class="text-xl">Roll to see who you steal!</p>
+                    </div>
+                </div>
+
+                <!-- Inventory Section -->
+                <div class="mt-8">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                        📂 Your Collection <span id="collection-stats" class="text-sm font-normal text-slate-400">(0/15)</span>
+                    </h2>
+                    <div id="inventory" class="inventory-grid">
+                        <!-- Cards added by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI Feedback Message -->
+    <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 px-6 py-3 rounded-full shadow-2xl border border-slate-600 transition-all opacity-0 pointer-events-none z-50">
+        Not enough coins!
+    </div>
+
+    <script>
+        // Character Data
+        const CHARACTERS = [
+            { id: 'ascended-baby', name: 'The Ascended Baby', rarity: 'holy', chance: 0.1 },
+            { id: 'baby-luis', name: 'Baby Luis', rarity: 'secret', chance: 0.9 },
+            { id: 'golden-luis', name: 'Golden Luis', rarity: 'legendary', chance: 2 },
+            { id: 'luis', name: 'Luis', rarity: 'legendary', chance: 2 },
+            { id: 'alan', name: 'Alan', rarity: 'epic', chance: 2 },
+            { id: 'baby-rami', name: 'Baby Rami', rarity: 'epic', chance: 2 },
+            { id: 'withered-eddie', name: 'Withered Eddie', rarity: 'epic', chance: 3 },
+            { id: 'withered-rami', name: 'Withered Rami', rarity: 'epic', chance: 3 },
+            { id: 'kam', name: 'Kam', rarity: 'uncommon', chance: 5 },
+            { id: 'ghost-luis', name: 'Ghost Luis', rarity: 'uncommon', chance: 5 },
+            { id: 'baby-eddie', name: 'Baby Eddie', rarity: 'uncommon', chance: 5 },
+            { id: 'rami', name: 'Rami', rarity: 'common', chance: 10 },
+            { id: 'eddie', name: 'Eddie', rarity: 'common', chance: 10 },
+            { id: 'bit-luis', name: '8-Bit Luis', rarity: 'common', chance: 10 },
+            { id: 'adrian', name: 'Adrian', rarity: 'dirt-cheap', chance: 40 }
+        ];
+
+        // State
+        let coins = 0;
+        let rolls = 0;
+        let collection = new Set();
+
+        // Load Game Progress
+        function loadGame() {
+            const savedData = localStorage.getItem('stealTheBabiesSave');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                coins = data.coins || 0;
+                rolls = data.rolls || 0;
+                collection = new Set(data.collection || []);
+            }
+            updateUI();
+        }
+
+        // Save Game Progress
+        function saveGame() {
+            const data = {
+                coins: coins,
+                rolls: rolls,
+                collection: Array.from(collection)
+            };
+            localStorage.setItem('stealTheBabiesSave', JSON.stringify(data));
+        }
+
+        function resetGame() {
+            if (confirm("Are you sure you want to delete all progress?")) {
+                localStorage.removeItem('stealTheBabiesSave');
+                location.reload();
+            }
+        }
+
+        // DOM Elements
+        const coinDisplay = document.getElementById('coin-display');
+        const rollCountDisplay = document.getElementById('roll-count');
+        const inventory = document.getElementById('inventory');
+        const clickBtn = document.getElementById('click-btn');
+        const rollBtn = document.getElementById('roll-btn');
+        const resultContainer = document.getElementById('result-container');
+        const idleMsg = document.getElementById('idle-msg');
+        const resultModel = document.getElementById('result-model');
+        const resultRarity = document.getElementById('result-rarity');
+        const resultName = document.getElementById('result-name');
+        const newTag = document.getElementById('new-tag');
+        const statsDisplay = document.getElementById('collection-stats');
+        const toast = document.getElementById('toast');
+
+        // SVG Models Factory
+        function getModel(id) {
+            const isBaby = id.startsWith('baby-') || id === 'ascended-baby';
+            let baseColor = '#9ca3af'; 
+            let effect = '';
+            
+            if (id.includes('rami')) baseColor = '#5D4037';
+            if (id.includes('luis')) baseColor = '#FBC02D';
+            if (id.includes('eddie')) baseColor = '#1976D2';
+            if (id.includes('kam')) baseColor = '#43A047';
+            if (id.includes('alan')) baseColor = '#E53935';
+            if (id.includes('adrian')) baseColor = '#8D6E63';
+            
+            // Special Overrides
+            if (id === 'ascended-baby') baseColor = 'url(#holyGradient)';
+            if (id === 'golden-luis') baseColor = '#FFD700';
+            if (id === 'ghost-luis') { baseColor = '#fff'; effect = 'opacity="0.4"'; }
+            if (id.includes('withered')) effect = 'class="withered"';
+
+            const scale = isBaby ? 'scale(0.7)' : 'scale(1)';
+            const hat = id.includes('rami') ? `<rect x="15" y="5" width="70" height="${id.includes('withered')?5:15}" fill="#222" rx="2"/>` : '';
+            const eyes = id.includes('withered') ? 
+                '<circle cx="40" cy="30" r="4" fill="red" /><circle cx="60" cy="30" r="4" fill="red" />' : 
+                '<circle cx="40" cy="30" r="3" fill="white" /><circle cx="60" cy="30" r="3" fill="white" />';
+            
+            const pixelEffect = id.includes('bit') ? '<rect x="0" y="0" width="100" height="100" fill="url(#pixelGrid)" />' : '';
+
+            return `
+                <svg viewBox="0 0 100 100" class="w-full h-full" style="transform: ${scale}" ${effect}>
+                    <defs>
+                        <linearGradient id="holyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00f2ff;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#ffffff;stop-opacity:1" />
+                        </linearGradient>
+                        <pattern id="pixelGrid" width="10" height="10" patternUnits="userSpaceOnUse">
+                            <rect width="10" height="10" fill="none" stroke="black" stroke-opacity="0.1"/>
+                        </pattern>
+                    </defs>
+                    <!-- Aura for Holy -->
+                    ${id === 'ascended-baby' ? '<circle cx="50" cy="50" r="45" fill="#00f2ff" opacity="0.2"><animate attributeName="r" values="40;48;40" dur="2s" repeatCount="indefinite"/></circle>' : ''}
+                    <!-- Body -->
+                    <circle cx="50" cy="65" r="30" fill="${baseColor}" />
+                    <!-- Head -->
+                    <circle cx="50" cy="35" r="25" fill="${baseColor}" />
+                    <!-- Face -->
+                    ${eyes}
+                    <path d="M 40 45 Q 50 55 60 45" stroke="white" fill="none" stroke-width="2" />
+                    ${hat}
+                    ${pixelEffect}
+                    ${isBaby ? '<path d="M 30 75 Q 50 85 70 75" stroke="#fff" fill="none" stroke-width="4" opacity="0.5"/>' : ''}
+                </svg>
+            `;
+        }
+
+        // Functions
+        function updateUI() {
+            coinDisplay.innerText = `💰 ${Math.floor(coins)} Coins`;
+            rollCountDisplay.innerText = `Total Rolls: ${rolls}`;
+            statsDisplay.innerText = `(${collection.size}/${CHARACTERS.length})`;
+            
+            inventory.innerHTML = '';
+            CHARACTERS.forEach(char => {
+                const hasChar = collection.has(char.id);
+                const div = document.createElement('div');
+                div.className = `p-2 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${hasChar ? 'bg-slate-700 border-slate-500 grayscale-0' : 'bg-slate-900/50 border-slate-800 grayscale opacity-40'}`;
+                div.innerHTML = `
+                    <div class="w-12 h-12">${getModel(char.id)}</div>
+                    <p class="text-[9px] mt-2 font-bold truncate w-full text-center rarity-${char.rarity}">${char.name}</p>
+                `;
+                inventory.appendChild(div);
+            });
+        }
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.style.opacity = '1';
+            setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+        }
+
+        function roll() {
+            if (coins < 10) {
+                showToast("Not enough coins! Click more!");
+                return;
+            }
+
+            coins -= 10;
+            rolls++;
+            
+            let rand = Math.random() * 100;
+            let cumulative = 0;
+            let selectedChar = CHARACTERS[CHARACTERS.length - 1];
+
+            for (let char of CHARACTERS) {
+                cumulative += char.chance;
+                if (rand <= cumulative) {
+                    selectedChar = char;
+                    break;
+                }
+            }
+
+            idleMsg.classList.add('hidden');
+            resultContainer.classList.remove('hidden');
+            resultModel.innerHTML = getModel(selectedChar.id);
+            resultName.innerText = selectedChar.name;
+            
+            // Handle display text for "Holy" rank
+            if (selectedChar.rarity === 'holy') {
+                resultRarity.innerText = "HOLY SHIT HOW DID YOU GET THIS";
+            } else {
+                resultRarity.innerText = selectedChar.rarity.replace('-', ' ');
+            }
+            
+            resultRarity.className = `uppercase tracking-widest text-[10px] font-black mb-1 rarity-${selectedChar.rarity}`;
+            
+            if (!collection.has(selectedChar.id)) {
+                newTag.classList.remove('hidden');
+                collection.add(selectedChar.id);
+            } else {
+                newTag.classList.add('hidden');
+            }
+
+            updateUI();
+            saveGame();
+        }
+
+        // Event Listeners
+        clickBtn.addEventListener('click', () => {
+            coins += 1;
+            updateUI();
+            saveGame();
+            
+            const particle = document.createElement('div');
+            particle.innerText = '+1';
+            particle.className = 'absolute text-yellow-400 font-bold pointer-events-none z-50';
+            particle.style.left = (Math.random() * 60 + 20) + '%';
+            particle.style.top = '40%';
+            clickBtn.parentElement.appendChild(particle);
+            
+            particle.animate([
+                { transform: 'translateY(0) scale(1)', opacity: 1 },
+                { transform: 'translateY(-120px) scale(1.8)', opacity: 0 }
+            ], { duration: 800, easing: 'ease-out' }).onfinish = () => particle.remove();
+        });
+
+        rollBtn.addEventListener('click', roll);
+
+        // Initial Load
+        loadGame();
+
+    </script>
+</body>
+</html>
